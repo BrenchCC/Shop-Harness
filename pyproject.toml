@@ -1,0 +1,29 @@
+[project]
+name = "shopharness"
+version = "0.1.0"
+description = "面向电商客服场景的 Agent Harness(Qwen3-8B 本地部署)"
+requires-python = ">=3.12"
+dependencies = [
+    "openai>=1.50",
+    "pydantic>=2.6",
+    "rank-bm25>=0.2.2",
+    "httpx>=0.27",
+    "langgraph>=1.0",
+    "langgraph-checkpoint-sqlite>=2.0",
+]
+
+[project.optional-dependencies]
+vllm = ["vllm>=0.25"]
+rag = ["transformers>=4.45", "numpy>=1.26"]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["shopharness"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
