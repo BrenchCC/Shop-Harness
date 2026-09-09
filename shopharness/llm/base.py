@@ -1,6 +1,6 @@
 """统一消息模型与 LLMClient 协议。
 
-Harness 只依赖本模块定义的协议,不关心底层是 Mock 还是 vLLM。
+Harness 只依赖本模块定义的协议,不关心底层是 Mock、云端 API 还是 vLLM。
 """
 
 from __future__ import annotations

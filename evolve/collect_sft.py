@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from shopharness.cli import build_harness  # noqa: E402
 from shopharness.config import Settings  # noqa: E402
 from shopharness.llm.base import Message  # noqa: E402
-from shopharness.llm.openai_client import OpenAIClient  # noqa: E402
+from shopharness.llm.vllm_client import VLLMClient  # noqa: E402
 
 from evolve.export_sft import mask_pii  # noqa: E402
 
@@ -58,7 +58,7 @@ SCRIPTS: list[list[str]] = [
 
 
 def to_openai(m: Message) -> dict:
-    return OpenAIClient._to_openai(m)
+    return VLLMClient._to_openai(m)
 
 
 def main() -> int:
@@ -70,7 +70,7 @@ def main() -> int:
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    llm = OpenAIClient(base_url=args.endpoint, model=args.model)
+    llm = VLLMClient(base_url = args.endpoint, model = args.model)
 
     n_samples = n_skipped = 0
     with tempfile.TemporaryDirectory() as tmpdir, \

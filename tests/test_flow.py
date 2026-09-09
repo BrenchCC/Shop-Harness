@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 import pytest
 
 from shopharness.data.seed import ensure_db
@@ -10,8 +12,14 @@ from shopharness.flows.aftersale import AftersaleFlow
 
 @pytest.fixture()
 def db_path(tmp_path):
+    """Seed a recent order in tmp_path independently of the current date."""
     path = str(tmp_path / "shop.db")
-    ensure_db(path)
+    conn = ensure_db(path)
+    # 测试订单保持在售后期内 / Keep fixture orders within the return window.
+    created = (datetime.now() - timedelta(days = 1)).strftime("%Y-%m-%d %H:%M:%S")
+    conn.execute("UPDATE orders SET created_at = ?", (created,))
+    conn.commit()
+    conn.close()
     return path
 
 
@@ -65,8 +73,9 @@ def test_checkpoint_recovery_after_restart(db_path):
 def test_overdue_order_goes_to_human(db_path):
     """超期订单走转人工方案。"""
     conn = ensure_db(db_path)
-    conn.execute("UPDATE orders SET created_at='2026-06-01 10:00:00' "
-                 "WHERE order_id='20260701002'")
+    created = (datetime.now() - timedelta(days = 30)).strftime("%Y-%m-%d %H:%M:%S")
+    conn.execute("UPDATE orders SET created_at = ? WHERE order_id = ?",
+                 (created, "20260701002"))
     conn.commit()
     flow = AftersaleFlow(db_path)
     view = flow.start("t-6", "20260701002")

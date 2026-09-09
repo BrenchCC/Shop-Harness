@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from shopharness.core.rag import (VectorStore, create_vector_store, rrf_fuse)
@@ -22,6 +24,11 @@ def shared_db(tmp_path_factory):
 
 @pytest.fixture(scope="session")
 def store(shared_db):
+    """Load an optional local model for shared_db; never download test weights."""
+    if not Path(MODEL_PATH).is_dir():
+        pytest.skip("Optional local bge model is not installed")
+    pytest.importorskip("torch")
+    pytest.importorskip("transformers")
     return VectorStore(shared_db, MODEL_PATH)
 
 

@@ -1,6 +1,6 @@
 # ShopHarness
 
-面向电商客服场景的 **Agent Harness(脚手架)** —— 让本地部署的 Qwen3-8B 打出大模型级客服效果。
+面向电商客服场景的 **Agent Harness(脚手架)** —— 支持云端 API 与可选的本地 Qwen3-8B 部署，为模型提供客服工具、上下文和执行约束。
 设计文档见 [DESIGN.md](DESIGN.md)(本仓库实现其 M1+M2 核心版)。
 
 ## 核心能力
@@ -22,41 +22,78 @@
 | 可观测性 | JSONL trace,字段对齐 OTel GenAI 语义约定 | `shopharness/core/trace.py` |
 | 评测 | 15 条脚本化场景,trajectory 断言 + `--gate` 回归门禁 | `eval/` |
 
-## 快速开始(Mock 模式,零 GPU 依赖)
+## 安装与 Mock 模式
+
+核心项目支持 Python 3.10 及以上，无需 GPU。安装基础包和测试依赖不会安装 vLLM、PyTorch 或 Transformers。
 
 ```bash
-# 环境(网络受限时走阿里云镜像)
-python3 -m pip install --user -i https://mirrors.aliyun.com/pypi/simple/ uv
-uv venv .venv --python 3.13
-uv pip install --python .venv/bin/python -i https://mirrors.aliyun.com/pypi/simple/ \
-    openai pydantic rank_bm25 pytest httpx
+pip install -e '.[dev]'
 
-# 跑测试与评测
-.venv/bin/python -m pytest tests/ -q      # 71 项
-.venv/bin/python eval/run_eval.py         # 15 场景
+python -m pytest
+python eval/run_eval.py --gate
 
-# 演示对话(含完整"改价确认"剧情)
 printf '有降噪耳机推荐吗\n帮我把订单 20260701001 改价到 900 元\n确认\n退出\n' \
-  | .venv/bin/python -m shopharness.cli --mock
+  | python -m shopharness.cli --mock
 ```
 
-## 真实模式(本地 vLLM + Qwen3-8B-FP8)
+未安装本地 bge 模型或向量依赖时，4 项向量集成测试会跳过；关键词检索和降级测试仍会运行。
+
+## 云端 API 模式
+
+使用支持 OpenAI Chat Completions 和 function calling 的云端模型。无需下载模型或启动 vLLM 服务。
+
+首次配置时复制模板；如果已经有 `.env`，直接编辑现有文件，不要覆盖：
+
+```bash
+cp -n .env.example .env
+python -m shopharness.cli
+```
+
+启动前填写 `.env`：
+
+```dotenv
+LLM_BASE_URL=https://ark.cn-beijing.volces.com/api/v3
+LLM_API_KEY=your-api-key
+MODEL=your-model-or-endpoint-id
+```
+
+`MODEL` 填写服务支持的模型 ID 或推理接入点 ID；`LLM_BASE_URL` 填写基础地址，不包含 `/chat/completions`。
+火山方舟调用可参考[官方 SDK 示例](https://github.com/volcengine/volcengine-python-sdk/blob/master/volcenginesdkexamples/volcenginesdkarkruntime/completions.py)。
+
+| 启动方式 | 模型来源 |
+| --- | --- |
+| `python -m shopharness.cli` | 工作目录下的 `.env` 或进程环境变量；没有云端配置时使用 Mock |
+| `python -m shopharness.cli --mock` | 强制 Mock，忽略云端配置 |
+| `python -m shopharness.cli --endpoint http://localhost:8000/v1` | 显式连接 vLLM，忽略云端地址、密钥和模型配置 |
+
+进程环境变量优先于 `.env`；`--model` 覆盖当前模式的模型。云端配置部分缺失会报错。
+`--mock` 与 `--endpoint` 互斥。`--thinking` 仅控制 vLLM，云端使用服务端默认思考设置。
+客户端错误不回显响应体或云端密钥；`.env` 不纳入版本控制。
+
+主代理和子代理共享所选客户端。训练、轨迹采集及自进化脚本保持原有 Mock/vLLM 行为，不自动读取云端配置。
+
+## 可选本地服务(vLLM + Qwen3-8B-FP8)
+
+连接已经运行的 vLLM 服务只需基础包；只有运行服务端才需要安装 `.[vllm]`。
+建议在独立的 GPU 服务环境安装该扩展，并按所选 vLLM 版本满足其 Python、操作系统和 CUDA 要求。
+核心项目支持 Python 3.10 不代表 vLLM 服务端也支持该版本。服务脚本使用服务环境中的 `.venv` 路径。
 
 ```bash
 # 1. 下载模型(ModelScope,约 9GB)
-.venv/bin/python scripts/download_model.py
+python scripts/download_model.py
 
 # 2. 安装 vLLM 并启动服务(RTX 4060 Ti 16GB 验证通过)
-uv pip install --python .venv/bin/python -i https://mirrors.aliyun.com/pypi/simple/ vllm
+pip install -e '.[vllm]'
 bash scripts/serve_vllm.sh        # 监听 :8000,hermes tool parser + qwen3 reasoning parser
 
 # 3. 对话(默认 /no_think 压低首 token 延迟;--thinking 开启思考模式)
-.venv/bin/python -m shopharness.cli --endpoint http://localhost:8000/v1
+python -m shopharness.cli --endpoint http://localhost:8000/v1
 ```
 
 > RAG(语义检索)为可选增强:下载 bge 向量模型后自动启用,缺失时降级为关键词检索
 > ```bash
-> uv pip install --python .venv/bin/python -i https://mirrors.aliyun.com/pypi/simple/ transformers
+> pip install -e '.[rag]'
+> pip install torch  # 在需要本地向量检索的环境中单独安装适合平台的 PyTorch
 > python -c "from modelscope import snapshot_download; \
 >   snapshot_download('BAAI/bge-small-zh-v1.5', local_dir='models/bge-small-zh-v1.5')"
 > ```
@@ -104,29 +141,29 @@ bash scripts/serve_vllm.sh        # 监听 :8000,hermes tool parser + qwen3 reas
 
 ```bash
 # 子代理(主代理工具表中已注册 delegate_research / delegate_aftersale)
-.venv/bin/python -m shopharness.cli --mock
+python -m shopharness.cli --mock
 > YX-1001 和 YX-1003 对比哪个好      # 触发检索子代理,主上下文只见摘要
 
 # 售后长流程(LangGraph,演示中断与跨进程恢复)
-.venv/bin/python -m shopharness.cli --flow aftersale
+python -m shopharness.cli --flow aftersale
 
 # 分层记忆(按买家 ID 沉淀,再次进入自动注入 L1)
-.venv/bin/python -m shopharness.cli --mock --buyer 张三
+python -m shopharness.cli --mock --buyer 张三
 
 # 自进化闭环(默认 dry-run:只出 bad case 报告与提案)
-.venv/bin/python -m evolve.run_cycle
-.venv/bin/python -m evolve.run_cycle --apply     # 完整闭环:门禁不过自动回滚
+python -m evolve.run_cycle
+python -m evolve.run_cycle --apply     # 完整闭环:门禁不过自动回滚
 
 # 数据飞轮导出(脱敏 + 校验)
-.venv/bin/python evolve/export_sft.py            # traces → evolve/out/sft.jsonl
-.venv/bin/python evolve/export_dpo.py            # traces → evolve/out/dpo.jsonl
+python evolve/export_sft.py            # traces → evolve/out/sft.jsonl
+python evolve/export_dpo.py            # traces → evolve/out/dpo.jsonl
 
 # Post-training 闭环(已实测跑通):
-.venv/bin/python evolve/collect_sft.py           # 真实 vLLM 轨迹采集(拒绝采样)
-.venv/bin/python evolve/train_lora.py            # QLoRA SFT(4bit nf4 + LoRA r16,16GB 显存)
-.venv/bin/python evolve/merge_lora.py            # adapter 合并回 BF16 基座
+python evolve/collect_sft.py           # 真实 vLLM 轨迹采集(拒绝采样)
+python evolve/train_lora.py            # QLoRA SFT(4bit nf4 + LoRA r16,16GB 显存)
+python evolve/merge_lora.py            # adapter 合并回 BF16 基座
 bash scripts/serve_sft.sh                        # 部署微调模型(动态 FP8 量化)
-.venv/bin/python evolve/eval_lora.py --model cs-sft   # 留出集对比
+python evolve/eval_lora.py --model cs-sft   # 留出集对比
 # 实测:留出集 trajectory 通过率 基线 5/6 → 微调后 6/6
 # (失败案例"精华到手价"微调后正确选择 calc_discount)
 ```
@@ -138,7 +175,7 @@ shopharness/        # harness 包(core / llm / tools / flows / data / cli)
 skills/             # SKILL.md 技能(可热加载)
 evolve/             # 自进化闭环 + SFT/DPO 数据飞轮导出(M4)
 eval/               # 15 条 trajectory 评测场景(含 --gate 回归门禁)
-tests/              # 64 项 pytest(全部 Mock,零外部依赖)
+tests/              # Mock / HTTP 模拟测试,另含 4 项可选本地向量集成测试
 scripts/            # 模型下载 + vLLM 启动
 traces/             # 运行生成的 JSONL trace(gitignore)
 models/             # Qwen3-8B-FP8 权重(gitignore)

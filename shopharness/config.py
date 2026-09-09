@@ -2,7 +2,56 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+import os
+from pathlib import Path
+from urllib.parse import urlsplit
+
+from dotenv import dotenv_values
+from pydantic import BaseModel, SecretStr
+
+
+class CloudLLMSettings(BaseModel):
+    """Cloud credentials, independent of local vLLM settings."""
+
+    base_url: str
+    api_key: SecretStr
+    model: str
+
+
+def load_cloud_settings(
+    env_path: str | Path = ".env", model: str | None = None
+) -> CloudLLMSettings | None:
+    """Load cloud configuration without modifying the process environment.
+
+    Args:
+        env_path: Dotenv file in the working directory by default.
+        model: Optional CLI model override.
+    """
+    # 显式读取且不污染本地模式 / Read explicitly without affecting local mode.
+    values = {**dotenv_values(env_path, interpolate = False), **os.environ}
+    names = ("LLM_BASE_URL", "LLM_API_KEY", "MODEL")
+    if not any(name in values for name in names):
+        return None
+    config = {name: (values.get(name) or "").strip() for name in names}
+    if model is not None:
+        config["MODEL"] = model.strip()
+    missing = [name for name in names if not config[name]]
+    if missing:
+        raise ValueError("云端配置缺失: " + ", ".join(missing))
+    try:
+        url = urlsplit(config["LLM_BASE_URL"])
+        valid = (url.scheme in ("http", "https") and url.hostname
+                 and not url.username and not url.password
+                 and not url.query and not url.fragment)
+    except ValueError:
+        valid = False
+    if not valid:
+        raise ValueError("LLM_BASE_URL 必须为不含凭据、查询参数或片段的 HTTP(S) 地址")
+    return CloudLLMSettings(
+        base_url = config["LLM_BASE_URL"],
+        api_key = SecretStr(config["LLM_API_KEY"]),
+        model = config["MODEL"],
+    )
 
 
 class Settings(BaseModel):

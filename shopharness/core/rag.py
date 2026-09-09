@@ -33,8 +33,9 @@ class Embedder:
         import torch
         from transformers import AutoModel, AutoTokenizer
         self.torch = torch
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
-        self.model = AutoModel.from_pretrained(model_path)
+        # 可选本地检索不自动下载 / Optional local retrieval never downloads weights.
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only = True)
+        self.model = AutoModel.from_pretrained(model_path, local_files_only = True)
         self.model.eval()
 
     def embed(self, texts: list[str]) -> np.ndarray:

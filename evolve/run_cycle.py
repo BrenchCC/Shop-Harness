@@ -44,8 +44,8 @@ def main() -> int:
     # 2. 提案
     llm = MockLLM()
     if args.endpoint:
-        from shopharness.llm.openai_client import OpenAIClient
-        llm = OpenAIClient(base_url=args.endpoint)
+        from shopharness.llm.vllm_client import VLLMClient
+        llm = VLLMClient(base_url = args.endpoint)
     import json
     from dataclasses import asdict
     out = Path("evolve/out")

@@ -1,17 +1,21 @@
 """演示对话 REPL。
 
 用法:
-    python -m shopharness.cli --mock                      # Mock 模式(默认,零依赖)
+    python -m shopharness.cli                             # .env 云端配置,无配置时 Mock
+    python -m shopharness.cli --mock                      # 强制 Mock
     python -m shopharness.cli --endpoint http://localhost:8000/v1  # 真实 vLLM
     printf '有耳机推荐吗\\n退出\\n' | python -m shopharness.cli --mock
 """
 
 from __future__ import annotations
 
-import argparse
+import os
 import sys
+import argparse
 
-from .config import Settings
+sys.path.append(os.getcwd())
+
+from .config import Settings, load_cloud_settings
 from .core.context import ContextManager
 from .core.harness import Harness, TurnResult
 from .core.hooks import HookBus
@@ -53,11 +57,26 @@ def build_harness(settings: Settings, llm: LLMClient,
 
 
 def make_llm(args: argparse.Namespace, settings: Settings) -> LLMClient:
-    if args.endpoint:
-        from .llm.openai_client import OpenAIClient
-        return OpenAIClient(base_url=args.endpoint, model=args.model,
-                            enable_thinking=args.thinking)
+    """Select a backend from args, using settings only for local defaults."""
     from .llm.mock_client import MockLLM
+
+    if args.mock:
+        return MockLLM()
+    if args.endpoint:
+        from .llm.vllm_client import VLLMClient
+        return VLLMClient(
+            base_url = args.endpoint,
+            model = args.model or settings.model,
+            enable_thinking = args.thinking,
+        )
+    cloud = load_cloud_settings(model = args.model)
+    if cloud is not None:
+        from .llm.openai_client import OpenAIClient
+        return OpenAIClient(
+            base_url = cloud.base_url,
+            model = cloud.model,
+            api_key = cloud.api_key.get_secret_value(),
+        )
     return MockLLM()
 
 
@@ -109,11 +128,13 @@ def run_flow(settings: Settings) -> None:
         return
 
 
-def main() -> None:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    """Parse argv, or process arguments when argv is None."""
     parser = argparse.ArgumentParser(description="ShopHarness 客服演示")
-    parser.add_argument("--mock", action="store_true", help="Mock 模式(默认)")
-    parser.add_argument("--endpoint", help="vLLM OpenAI endpoint")
-    parser.add_argument("--model", default=Settings().model)
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--mock", action = "store_true", help = "强制 Mock,忽略云端配置")
+    modes.add_argument("--endpoint", help = "显式连接 vLLM,忽略云端配置")
+    parser.add_argument("--model", help = "覆盖当前模式的模型")
     parser.add_argument("--thinking", action="store_true",
                         help="开启 Qwen3 思考模式")
     parser.add_argument("--verbose", action="store_true")
@@ -122,16 +143,33 @@ def main() -> None:
                         help="买家 ID(记忆按此维度沉淀)")
     parser.add_argument("--flow", choices=["aftersale"],
                         help="进入长流程演示(售后工单)")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    if args.thinking and not args.endpoint:
+        parser.error("--thinking 仅适用于 --endpoint 指定的 vLLM 服务")
+    return args
+
+
+def main() -> int:
+    """Run the configured customer-service CLI."""
+    args = parse_args()
 
     settings = Settings()
     if args.flow:
         run_flow(settings)
-        return
+        return 0
 
-    harness = build_harness(settings, make_llm(args, settings), args.session,
-                            buyer_id=args.buyer)
-    mode = f"vLLM({args.endpoint})" if args.endpoint else "Mock"
+    try:
+        llm = make_llm(args, settings)
+    except ValueError as exc:
+        print(f"配置错误: {exc}", file = sys.stderr)
+        return 2
+    harness = build_harness(
+        settings,
+        llm,
+        args.session,
+        buyer_id = args.buyer,
+    )
+    mode = getattr(llm, "mode", "Mock")
     print(f"ShopHarness 客服 demo [{mode} 模式] — 输入买家消息,Ctrl-D 退出")
     print(f"trace: {harness.tracer.path}\n")
 
@@ -155,6 +193,7 @@ def main() -> None:
 
     harness.end_session()  # M4a:沉淀情景/语义记忆
     print(f"(会话摘要与买家画像已写入记忆库:{settings.db_path})")
+    return 0
 
 
 if __name__ == "__main__":

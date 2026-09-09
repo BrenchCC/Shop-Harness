@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-ShopHarness is a Python customer-service agent harness for locally served Qwen models.
+ShopHarness is a Python customer-service agent harness for cloud APIs and optionally locally served Qwen models.
 
 - `shopharness/core/`: agent loop, context, permissions, retrieval, memory, and handoff.
 - `shopharness/llm/`, `tools/`, and `flows/`: model clients, business tools, and resumable after-sales workflows.
@@ -14,7 +14,7 @@ ShopHarness is a Python customer-service agent harness for locally served Qwen m
 
 ## Build, Test, and Development Commands
 
-Use Python 3.12 or newer. Run commands from the repository root so relative skill and data paths resolve correctly.
+Use Python 3.10 or newer for the core package. The optional vLLM server has its own Python, platform, and GPU requirements. Run commands from the repository root so relative skill and data paths resolve correctly.
 
 ```bash
 pip install -e '.[dev]'                 # Install package and test dependencies

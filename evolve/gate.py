@@ -13,8 +13,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def check(python: str | None = None) -> tuple[bool, str]:
-    """跑回归评测,返回 (是否放行, 输出摘要)。"""
-    py = python or str(REPO_ROOT / ".venv" / "bin" / "python")
+    """Run evaluation with optional python executable; default to this interpreter."""
+    # 沿用当前环境 / Preserve the active Conda or virtualenv interpreter.
+    py = python or sys.executable
     proc = subprocess.run(
         [py, "eval/run_eval.py", "--gate"],
         cwd=REPO_ROOT, capture_output=True, text=True, timeout=300)

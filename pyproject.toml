@@ -1,10 +1,11 @@
 [project]
 name = "shopharness"
 version = "0.1.0"
-description = "面向电商客服场景的 Agent Harness(Qwen3-8B 本地部署)"
-requires-python = ">=3.12"
+description = "面向电商客服场景的 Agent Harness(云端 API / 可选本地 vLLM)"
+requires-python = ">=3.10"
 dependencies = [
     "openai>=1.50",
+    "python-dotenv>=1.0",
     "pydantic>=2.6",
     "rank-bm25>=0.2.2",
     "httpx>=0.27",

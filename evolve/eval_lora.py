@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from shopharness.cli import build_harness  # noqa: E402
 from shopharness.config import Settings  # noqa: E402
-from shopharness.llm.openai_client import OpenAIClient  # noqa: E402
+from shopharness.llm.vllm_client import VLLMClient  # noqa: E402
 
 # 留出场景:与 collect_sft.py 训练脚本无重叠
 HELD_OUT: list[tuple[str, list[str], list[str]]] = [
@@ -37,7 +37,7 @@ BAD_EVENTS = {"correction", "tool_error", "circuit_break", "handoff"}
 
 
 def run(model: str, endpoint: str) -> tuple[int, list[str]]:
-    llm = OpenAIClient(base_url=endpoint, model=model)
+    llm = VLLMClient(base_url = endpoint, model = model)
     passed = 0
     lines: list[str] = []
     with tempfile.TemporaryDirectory() as tmpdir:

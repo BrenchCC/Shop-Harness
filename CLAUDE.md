@@ -4,38 +4,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ShopHarness is an **Agent Harness** (scaffold) that wraps a locally-deployed Qwen3-8B model to deliver production-grade e-commerce customer service (售前/售中/售后). The thesis: models are commoditized, the harness is the moat. It layers context engineering, tool calling, permission/safety, subagents, memory, and a self-evolution loop on top of a small open model.
+ShopHarness is an **Agent Harness** (scaffold) that wraps a cloud API or an optionally locally-deployed Qwen3-8B model to deliver production-grade e-commerce customer service (售前/售中/售后). The thesis: models are commoditized, the harness is the moat. It layers context engineering, tool calling, permission/safety, subagents, memory, and a self-evolution loop on top of a small open model.
 
 The repo implements DESIGN.md's M1+M2 core plus M3 (subagents + LangGraph flows) and M4 (memory + self-evolution + data flywheel). `DESIGN.md` is the full architecture; `README.md` maps it to code; `RESUME.md` is interview Q&A. All prose, docstrings, and comments in the source are written in **Chinese** — match that style in new code.
 
-The whole system runs without a GPU in **Mock mode** (a scripted `MockLLM`), which is what all tests and eval use. Real inference is via a local vLLM server behind an OpenAI-compatible endpoint.
+The whole system runs without a GPU in **Mock mode** (a scripted `MockLLM`), which is what all tests and eval use. Real inference uses cloud Chat Completions or an explicitly selected vLLM endpoint. Cloud mode does not require the vLLM server package.
 
 ## Commands
 
 ### Setup
 
 ```bash
-uv venv .venv --python 3.13
-uv pip install --python .venv/bin/python -i https://mirrors.aliyun.com/pypi/simple/ \
-    openai pydantic rank_bm25 pytest httpx langgraph langgraph-checkpoint-sqlite
+pip install -e '.[dev]'  # Python >=3.10; does not install vLLM
 ```
 
-(Network-constrained envs use the Aliyun mirror. `pyproject.toml` declares deps; install extras via `--extra rag` / `--extra vllm` / `--extra dev` as needed.)
+(Network-constrained envs use the Aliyun mirror. `pyproject.toml` declares deps; install extras via `pip install -e '.[rag]'` / `'.[vllm]'` / `'.[dev]'` as needed.)
 
 ### Tests
 
 ```bash
-.venv/bin/python -m pytest            # full suite (run from repo root; `-q` + testpaths are in pyproject)
-.venv/bin/python -m pytest tests/test_harness.py -k <test_name>   # single test
+python -m pytest            # full suite (run from repo root; `-q` + testpaths are in pyproject)
+python -m pytest tests/test_harness.py -k <test_name>   # single test
 ```
 
-All 71 tests are pure-Mock with zero external dependencies. `tests/conftest.py` builds a `Harness` via `build_harness()` with `rag_enabled=False` and a tmp SQLite DB. It also exports `event_types()` and `tool_calls()` helpers for asserting on `TurnResult.events`.
+Core tests use MockLLM or simulated HTTP without network access. Four optional vector integration tests skip when the local bge model or inference dependencies are absent. `tests/conftest.py` builds a `Harness` via `build_harness()` with `rag_enabled=False` and a tmp SQLite DB. It also exports `event_types()` and `tool_calls()` helpers for asserting on `TurnResult.events`.
 
 ### Eval (trajectory scenarios)
 
 ```bash
-.venv/bin/python eval/run_eval.py          # 15 scripted scenarios, pass/fail matrix
-.venv/bin/python eval/run_eval.py --gate   # exit-code variant used as CI/self-evolution gate
+python eval/run_eval.py          # 15 scripted scenarios, pass/fail matrix
+python eval/run_eval.py --gate   # exit-code variant used as CI/self-evolution gate
 ```
 
 Scenarios assert tool-call subsequence, event stream (intercept/guardrail/circuit-break/compaction/handoff), DB final state, and L2 fact retention — not single outputs.
@@ -44,17 +42,17 @@ Scenarios assert tool-call subsequence, event stream (intercept/guardrail/circui
 
 ```bash
 printf '有降噪耳机推荐吗\n帮我把订单 20260701001 改价到 900 元\n确认\n退出\n' \
-  | .venv/bin/python -m shopharness.cli --mock      # full "改价确认" plot
-.venv/bin/python -m shopharness.cli --flow aftersale            # LangGraph flow demo (interrupt + resume)
-.venv/bin/python -m shopharness.cli --mock --buyer 张三           # memory injection demo
+  | python -m shopharness.cli --mock      # full "改价确认" plot
+python -m shopharness.cli --flow aftersale            # LangGraph flow demo (interrupt + resume)
+python -m shopharness.cli --mock --buyer 张三           # memory injection demo
 ```
 
 ### Real model (local vLLM + Qwen3-8B-FP8)
 
 ```bash
-.venv/bin/python scripts/download_model.py      # ModelScope download (~9GB)
+python scripts/download_model.py      # ModelScope download (~9GB)
 bash scripts/serve_vllm.sh                       # :8000, hermes tool parser + qwen3 reasoning parser
-.venv/bin/python -m shopharness.cli --endpoint http://localhost:8000/v1
+python -m shopharness.cli --endpoint http://localhost:8000/v1
 ```
 
 See `scripts/serve_vllm.sh` for the two known Linux host gotchas: missing gcc (needs `CC`/`CXX`) and missing nvcc (needs `VLLM_USE_FLASHINFER_SAMPLER=0`).
@@ -62,14 +60,14 @@ See `scripts/serve_vllm.sh` for the two known Linux host gotchas: missing gcc (n
 ### Self-evolution / data flywheel (M4)
 
 ```bash
-.venv/bin/python -m evolve.run_cycle            # dry-run: bad-case report + proposals only
-.venv/bin/python -m evolve.run_cycle --apply    # full loop (offline gate → gray release → rollback on failure)
-.venv/bin/python evolve/export_sft.py           # traces → evolve/out/sft.jsonl (PII scrubbed)
-.venv/bin/python evolve/export_dpo.py           # traces → evolve/out/dpo.jsonl
-.venv/bin/python evolve/collect_sft.py          # reject-sampling real vLLM trajectories
-.venv/bin/python evolve/train_lora.py           # QLoRA SFT (4bit nf4 + LoRA r16)
-.venv/bin/python evolve/merge_lora.py           # merge adapter back to BF16
-.venv/bin/python evolve/eval_lora.py --model cs-sft
+python -m evolve.run_cycle            # dry-run: bad-case report + proposals only
+python -m evolve.run_cycle --apply    # full loop (offline gate → gray release → rollback on failure)
+python evolve/export_sft.py           # traces → evolve/out/sft.jsonl (PII scrubbed)
+python evolve/export_dpo.py           # traces → evolve/out/dpo.jsonl
+python evolve/collect_sft.py          # reject-sampling real vLLM trajectories
+python evolve/train_lora.py           # QLoRA SFT (4bit nf4 + LoRA r16)
+python evolve/merge_lora.py           # merge adapter back to BF16
+python evolve/eval_lora.py --model cs-sft
 ```
 
 ## Architecture
@@ -79,11 +77,11 @@ See `scripts/serve_vllm.sh` for the two known Linux host gotchas: missing gcc (n
 ```
 channel (cli.py) → Harness Core (loop/context/permissions/skills/memory)
                  → tool layer (ToolRegistry → SQLite)
-                 → inference (LLMClient Protocol → MockLLM | OpenAIClient → vLLM)
+                 → inference (LLMClient Protocol → MockLLM | OpenAIClient → cloud | VLLMClient → vLLM)
                  → data (SQLite shop.db + JSONL traces)
 ```
 
-The decoupling rule: the harness only talks to a model through the `LLMClient` Protocol and to tools only through `ToolRegistry`. Either side is independently swappable (mock ↔ vLLM; in-process registry ↔ MCP server later).
+The decoupling rule: the harness only talks to a model through the `LLMClient` Protocol and to tools only through `ToolRegistry`. Either side is independently swappable (mock ↔ cloud ↔ vLLM; in-process registry ↔ MCP server later).
 
 ### The composition root
 
