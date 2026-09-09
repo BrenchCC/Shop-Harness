@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "面向电商客服场景的 Agent Harness(云端 API / 可选本地 vLLM)"
 requires-python = ">=3.10"
 dependencies = [
+    "numpy>=1.26",
     "openai>=1.50",
     "python-dotenv>=1.0",
     "pydantic>=2.6",
@@ -15,7 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 vllm = ["vllm>=0.25"]
-rag = ["transformers>=4.45", "numpy>=1.26"]
+rag = ["transformers>=4.45"]
 dev = ["pytest>=8.0"]
 
 [build-system]

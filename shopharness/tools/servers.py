@@ -99,7 +99,7 @@ def make_tools(conn: sqlite3.Connection,
                     hits.append({"question": row["question"],
                                  "answer": row["answer"],
                                  "similarity": round(sim, 3)})
-        else:
+        if not hits:
             for row in conn.execute("SELECT * FROM faqs").fetchall():
                 if any(t in row["question"] + row["answer"]
                        for t in query.split()):

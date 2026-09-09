@@ -18,6 +18,53 @@ class CloudLLMSettings(BaseModel):
     model: str
 
 
+class CloudEmbeddingSettings(BaseModel):
+    """Embedding credentials, independent of conversation model settings."""
+
+    base_url: str
+    api_key: SecretStr
+    model: str
+
+
+def load_embedding_settings(env_path: str | Path = ".env") -> CloudEmbeddingSettings | None:
+    """Load independent embedding credentials from env_path and process variables."""
+    file_values = dotenv_values(env_path, interpolate = False)
+    names = ("EMBEDDING_BASE_URL", "EMBEDDING_API_KEY", "EMBEDDING_MODEL")
+    alias = "EMBEDDDING_MODEL"
+    # 兼容已有拼写，进程配置优先 / Accept the existing alias, process values first.
+    values = {}
+    for source in (file_values, os.environ):
+        values.update({name: source[name] for name in names if name in source})
+        if "EMBEDDING_MODEL" not in source and alias in source:
+            values["EMBEDDING_MODEL"] = source[alias]
+    if not values:
+        return None
+    config = {name: (values.get(name) or "").strip() for name in names}
+    missing = [name for name in names if not config[name]]
+    if missing:
+        raise ValueError("云端向量配置缺失: " + ", ".join(missing))
+    _validate_base_url(config["EMBEDDING_BASE_URL"], "EMBEDDING_BASE_URL")
+    return CloudEmbeddingSettings(
+        base_url = config["EMBEDDING_BASE_URL"],
+        api_key = SecretStr(config["EMBEDDING_API_KEY"]),
+        model = config["EMBEDDING_MODEL"],
+    )
+
+
+def _validate_base_url(value: str, name: str) -> None:
+    """Validate URL value and identify invalid configuration by name, without echoing it."""
+    try:
+        url = urlsplit(value)
+        valid = (url.scheme in ("http", "https") and url.hostname
+                 and not url.username and not url.password
+                 and not url.query and not url.fragment)
+        url.port
+    except ValueError:
+        valid = False
+    if not valid:
+        raise ValueError(f"{name} 必须为不含凭据、查询参数或片段的 HTTP(S) 地址")
+
+
 def load_cloud_settings(
     env_path: str | Path = ".env", model: str | None = None
 ) -> CloudLLMSettings | None:
@@ -38,15 +85,7 @@ def load_cloud_settings(
     missing = [name for name in names if not config[name]]
     if missing:
         raise ValueError("云端配置缺失: " + ", ".join(missing))
-    try:
-        url = urlsplit(config["LLM_BASE_URL"])
-        valid = (url.scheme in ("http", "https") and url.hostname
-                 and not url.username and not url.password
-                 and not url.query and not url.fragment)
-    except ValueError:
-        valid = False
-    if not valid:
-        raise ValueError("LLM_BASE_URL 必须为不含凭据、查询参数或片段的 HTTP(S) 地址")
+    _validate_base_url(config["LLM_BASE_URL"], "LLM_BASE_URL")
     return CloudLLMSettings(
         base_url = config["LLM_BASE_URL"],
         api_key = SecretStr(config["LLM_API_KEY"]),
@@ -74,6 +113,7 @@ class Settings(BaseModel):
     # RAG:向量检索(bge-small-zh);模型缺失时自动降级为纯关键词检索
     rag_enabled: bool = True
     embedding_model: str = "models/bge-small-zh-v1.5"
+    cloud_embedding: CloudEmbeddingSettings | None = None
 
     # vLLM(OpenAI-compatible)接入参数
     model: str = "Qwen/Qwen3-8B-FP8"

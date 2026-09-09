@@ -10,7 +10,7 @@
 | Harness 主 loop | turn 管理、最大步数、非法工具自我纠正、连续失败熔断 | `shopharness/core/harness.py` |
 | 上下文工程 | 分层上下文(L0 技能指令 / L1 记忆 / L2 结构化状态 / L3+L4 历史)+ 三级 compaction | `shopharness/core/context.py` |
 | 工具系统 | 9 个业务工具(SQLite),OpenAI function calling schema,按技能白名单动态裁剪 | `shopharness/tools/` |
-| **RAG 检索增强** | bge-small-zh 向量语义检索 + 关键词检索,RRF 混合排序;商品库 + FAQ 知识库;模型缺失自动降级 | `shopharness/core/rag.py` |
+| **RAG 检索增强** | 云端 Embedding 或本地 bge-small-zh + 关键词检索,商品 RRF 混合排序;商品库 + FAQ 知识库;向量不可用时自动降级 | `shopharness/core/rag.py` |
 | 权限模型 | READ / WRITE / DANGEROUS 三级;改价须经买家复述确认 + 最低限价护栏 + 审计落库 | `shopharness/core/permissions.py`、`hooks.py` |
 | Skills | 目录式 SKILL.md(询单转化 / 催付 / 退换 SOP),意图路由激活,热加载 | `skills/`、`core/skills.py` |
 | 转人工 | 关键词/熔断/步数超限触发,自动生成交接摘要并建工单 | `shopharness/core/handoff.py` |
@@ -71,6 +71,33 @@ MODEL=your-model-or-endpoint-id
 客户端错误不回显响应体或云端密钥；`.env` 不纳入版本控制。
 
 主代理和子代理共享所选客户端。训练、轨迹采集及自进化脚本保持原有 Mock/vLLM 行为，不自动读取云端配置。
+
+## 云端向量检索(百炼 OpenAI 兼容接口)
+
+在 `.env` 中添加独立向量配置，使用基础安装即可，无需安装 vLLM、PyTorch、Transformers 或下载 bge：
+
+```dotenv
+EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+EMBEDDING_API_KEY=your-embedding-api-key
+EMBEDDING_MODEL=text-embedding-v4
+```
+
+`EMBEDDING_BASE_URL` 使用与密钥地域匹配的 OpenAI 兼容基础地址，不附加 `/embeddings`。
+调用方式参考[百炼官方 OpenAI Embedding 文档](https://help.aliyun.com/zh/model-studio/embedding-interfaces-compatible-with-openai)：
+使用 `client.embeddings.create`、`encoding_format="float"`，每批最多 10 条文本，使用模型默认维度。
+客户端按响应 `index` 恢复顺序，校验维度和数值并进行 L2 归一化。
+
+- 向量配置与对话模型的地址、密钥和模型名分别读取，不共用凭据。进程环境变量优先于 `.env`。
+- 兼容现有拼写 `EMBEDDDING_MODEL`；同一配置来源中，标准名称 `EMBEDDING_MODEL` 优先。
+- 普通启动与 `--endpoint` 模式均可使用云端向量；`--endpoint` 仍忽略云端**对话**配置。`--mock` 跳过云端对话和云端向量配置，保持离线演示。
+- 未配置云端向量时尝试可选本地 bge，缺少模型时使用关键词检索；部分云端向量配置缺失则在启动时报错。
+- 首次启动会为商品介绍和 FAQ 建立 SQLite 缓存；后续启动只更新新增、修改的文档，并清除已删除文档的向量。
+- 缓存记录后端、地址、模型的身份及维度。切换模型或遇到旧的无元数据缓存时重新构建，全部成功后替换，不混合不同模型的向量。
+- 初始化或查询失败会输出不含密钥的提示并回退关键词检索；原有缓存不会因一次 API 构建失败被清空。
+
+```bash
+python -m shopharness.cli
+```
 
 ## 可选本地服务(vLLM + Qwen3-8B-FP8)
 

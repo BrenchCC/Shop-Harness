@@ -209,6 +209,11 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+# Runtime shop data, embedding cache, and conversation traces
+/shopharness/data/*.db
+/shopharness/data/*.db-*
+/traces/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

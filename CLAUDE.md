@@ -98,7 +98,7 @@ The decoupling rule: the harness only talks to a model through the `LLMClient` P
 - **`permissions.py` + `hooks.py`** — READ/WRITE/DANGEROUS levels; dangerous ops (改价/退款) require buyer confirmation (the `_pending_dangerous` gate), a pre-tool guardrail (min-price rule), and audit logging. Hooks are registered in `build_harness` via `make_price_guardrail` / `make_audit_hook`.
 - **`subagent.py`** — `SubagentRunner` runs a context-isolated harness loop and returns only a conclusion summary; registered into the main tool table as `delegate_*` tools.
 - **`memory.py`** — three-layer memory (episodic summary / semantic buyer profile / procedural skill versions), injected as L1 at session start.
-- **`rag.py`** — bge-small-zh vector search + keyword search fused with RRF; auto-degrades to keyword-only when the embedding model is absent.
+- **`rag.py`** — independent cloud embeddings or optional local bge-small-zh, with product keyword/vector RRF. SQLite caches track model identity and dimensions; changed documents refresh at startup. API failures fall back to keywords. CLI loads `EMBEDDING_BASE_URL`, `EMBEDDING_API_KEY`, and `EMBEDDING_MODEL` (also accepts `EMBEDDDING_MODEL`); `--mock` skips cloud configuration. Library `Settings()` never reads `.env` implicitly.
 - **`trace.py`** — JSONL tracer whose span fields align with OTel GenAI semantic conventions.
 
 ### Tools (`shopharness/tools/`)

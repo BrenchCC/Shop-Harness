@@ -15,7 +15,7 @@ import argparse
 
 sys.path.append(os.getcwd())
 
-from .config import Settings, load_cloud_settings
+from .config import Settings, load_cloud_settings, load_embedding_settings
 from .core.context import ContextManager
 from .core.harness import Harness, TurnResult
 from .core.hooks import HookBus
@@ -39,7 +39,9 @@ def build_harness(settings: Settings, llm: LLMClient,
     conn = ensure_db(settings.db_path)
     vector_store = None
     if settings.rag_enabled:
-        vector_store = create_vector_store(conn, settings.embedding_model)
+        vector_store = create_vector_store(
+            conn, settings.embedding_model, settings.cloud_embedding,
+        )
     registry = build_registry(conn, vector_store)
     hooks = HookBus(pre_hooks=[make_price_guardrail(conn)],
                     post_hooks=[make_audit_hook(conn)])
@@ -159,6 +161,8 @@ def main() -> int:
         return 0
 
     try:
+        if not args.mock and settings.rag_enabled:
+            settings.cloud_embedding = load_embedding_settings()
         llm = make_llm(args, settings)
     except ValueError as exc:
         print(f"配置错误: {exc}", file = sys.stderr)
