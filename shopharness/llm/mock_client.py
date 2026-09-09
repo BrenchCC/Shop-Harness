@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import re
+import json
 
 from ..llm.base import Message, ToolCall
 
@@ -20,7 +21,12 @@ PRICE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*元")
 
 PRODUCT_WORDS = ["耳机", "键盘", "鼠标", "枕头", "四件套", "冲锋衣", "T恤",
                  "加湿器", "净化器", "气泡水", "咖啡", "绘本", "点读笔",
-                 "瑜伽垫", "跳绳", "洗面奶", "精华", "杯垫"]
+                 "瑜伽垫", "跳绳", "洗面奶", "精华", "杯垫",
+                 "音箱", "麦克风", "手机支架", "扩展坞", "电脑支架", "摄像头",
+                 "窗帘", "收纳箱", "地垫", "水杯", "徒步鞋", "背包", "遮阳帽",
+                 "运动袜", "台灯", "打蛋器", "风扇", "坚果", "燕麦", "花茶",
+                 "拼图", "积木", "画板", "训练带", "水壶", "露营椅", "身体乳",
+                 "洁面巾", "分装瓶"]
 
 
 class MockLLM:
@@ -80,6 +86,17 @@ class MockLLM:
 
     def _on_tool_result(self, messages: list[Message], last: Message) -> Message:
         content = last.content or ""
+        if last.name == "list_orders" and "[工具错误]" not in content:
+            data = json.loads(content)
+            if not data["orders"]:
+                return Message.assistant("当前账号暂无订单。")
+            lines = [f"为您查到 {data['count']} 笔订单："]
+            lines.extend(
+                f"{order['order_id']} | {order['product_name']} | "
+                f"{order['amount']:.2f} 元 | {order['status']}"
+                for order in data["orders"]
+            )
+            return Message.assistant("\n".join(lines))
         if "[系统拦截]" in content:
             call = self._last_tool_call(messages, "adjust_price")
             if call:
@@ -160,8 +177,10 @@ class MockLLM:
         if "处理" in text and any(kw in text for kw in ("退货", "退款", "换货")):
             return self._call("delegate_aftersale", {"issue": text})
         if "订单" in text:
+            if order_id is None:
+                return self._call("list_orders", {})
             return self._call("get_order",
-                              {"order_id": order_id or "20260701001"})
+                              {"order_id": order_id})
         if any(kw in text for kw in ("优惠", "便宜", "到手")):
             sku = SKU_RE.search(text)
             return self._call("calc_discount",

@@ -1,6 +1,6 @@
 """SQLite 建库与种子数据。
 
-种子数据围绕 demo/eval 场景设计:
+50 件虚构商品的种子数据围绕 demo/eval 场景设计:
 - YX-1001 无线降噪耳机(改价剧情主角:售价 999,最低限价 880)
 - 订单 20260701001(YX-1001,待发货)/ 20260701002(已发货有物流)/ 20260701003(待付款,催付场景)
 """
@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS orders (
     buyer TEXT NOT NULL,
     address TEXT NOT NULL,
     note TEXT DEFAULT '',
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    buyer_id TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS logistics (
     order_id TEXT PRIMARY KEY REFERENCES orders(order_id),
@@ -104,6 +105,66 @@ PRODUCTS = [
      "5重玻尿酸;补水锁水;无酒精无香精"),
     ("YX-9101", "暖冬恒温暖杯垫", "生活电器", 79.0, 62.0, 275,
      "55℃恒温;重力感应自动开关;防水面板"),
+    ("YX-1004", "音弦便携蓝牙音箱", "数码影音", 189.0, 159.0, 180,
+     "双扬声器;续航12小时;附便携挂绳;适合桌面与露营"),
+    ("YX-1005", "音弦领夹无线麦克风", "数码影音", 239.0, 199.0, 120,
+     "一拖二收音;USB-C接收器;充电盒收纳;适合访谈录音"),
+    ("YX-1006", "音弦桌面手机支架", "数码影音", 49.0, 35.0, 360,
+     "角度可调;折叠收纳;防滑底座;支持横竖屏摆放"),
+    ("YX-2003", "极光USB-C扩展坞", "电脑外设", 159.0, 129.0, 200,
+     "HDMI与USB接口;支持PD供电;铝合金外壳;外接显示器需设备支持视频输出"),
+    ("YX-2004", "极光笔记本电脑支架", "电脑外设", 89.0, 69.0, 230,
+     "六档高度调节;铝合金材质;折叠便携;适合13至16英寸笔记本"),
+    ("YX-2005", "极光加大桌面鼠标垫", "电脑外设", 39.0, 29.0, 510,
+     "800×300mm;织物表面;橡胶防滑底;包边设计"),
+    ("YX-2006", "极光1080P网络摄像头", "电脑外设", 199.0, 169.0, 140,
+     "USB即插即用;内置麦克风;隐私遮挡盖;适合线上会议"),
+    ("YX-3003", "云朵遮光窗帘 单片", "家居生活", 129.0, 99.0, 190,
+     "宽1.5米高2.7米;挂钩安装;可机洗;下单前请测量窗户尺寸"),
+    ("YX-3004", "云朵可折叠收纳箱 40L", "家居生活", 59.0, 45.0, 330,
+     "透明翻盖;可叠放;折叠节省空间;适合衣物与玩具收纳"),
+    ("YX-3005", "云朵浴室防滑地垫", "家居生活", 45.0, 32.0, 260,
+     "40×60cm;吸水绒面;防滑底层;可清洗晾干"),
+    ("YX-3006", "云朵双层玻璃水杯 350ml", "家居生活", 69.0, 49.0, 170,
+     "双层隔热;带杯盖;透明杯身;不可用于明火加热"),
+    ("YX-4003", "山野轻量徒步鞋", "服饰鞋包", 329.0, 279.0, 150,
+     "橡胶防滑鞋底;透气鞋面;缓震鞋垫;尺码36至44"),
+    ("YX-4004", "山野通勤双肩背包 20L", "服饰鞋包", 199.0, 159.0, 210,
+     "独立电脑夹层;双侧水杯袋;加宽肩带;适合15.6英寸笔记本"),
+    ("YX-4005", "山野折叠遮阳帽", "服饰鞋包", 69.0, 49.0, 300,
+     "宽帽檐;可调节围度;可拆防风绳;折叠便携"),
+    ("YX-4006", "山野棉质运动袜 5双装", "服饰鞋包", 49.0, 35.0, 420,
+     "棉混纺面料;毛圈袜底;中筒设计;黑白灰基础配色"),
+    ("YX-5003", "小魔方LED阅读台灯", "生活电器", 139.0, 109.0, 240,
+     "三档色温;亮度可调;柔光灯罩;USB-C供电"),
+    ("YX-5004", "小魔方便携电动打蛋器", "生活电器", 99.0, 79.0, 180,
+     "五档速度;双搅拌棒;一键退棒;配件可拆洗"),
+    ("YX-5005", "小魔方桌面循环风扇", "生活电器", 169.0, 139.0, 210,
+     "三档风速;上下角度可调;定时关闭;前网罩可拆洗"),
+    ("YX-6003", "元气混合坚果 7袋装", "食品酒水", 49.9, 39.9, 540,
+     "每日独立小包装;含腰果杏仁核桃;含坚果过敏原;开封即食"),
+    ("YX-6004", "元气原味燕麦片 1kg", "食品酒水", 35.9, 28.9, 460,
+     "配料为燕麦;热水冲泡;拉链袋包装;适合早餐搭配"),
+    ("YX-6005", "元气茉莉花茶 20袋装", "食品酒水", 39.9, 29.9, 380,
+     "独立茶包;茉莉花香;冷热泡皆可;茶叶含天然咖啡因"),
+    ("YX-7003", "乐读木质拼图 60片", "母婴玩具", 59.0, 45.0, 220,
+     "海洋动物主题;圆角拼片;适合4岁以上;需成人陪同使用"),
+    ("YX-7004", "乐读大颗粒积木 80粒", "母婴玩具", 129.0, 99.0, 160,
+     "大颗粒易抓握;附收纳盒;多色搭配;适合3岁以上"),
+    ("YX-7005", "乐读儿童涂鸦画板", "母婴玩具", 89.0, 69.0, 200,
+     "双面书写;附水性画笔;可擦写;适合3岁以上"),
+    ("YX-8003", "轻氧弹力训练带 3条装", "运动户外", 59.0, 45.0, 310,
+     "三档阻力;附收纳袋;适合热身与拉伸;使用前检查有无破损"),
+    ("YX-8004", "轻氧不锈钢保温运动水壶 600ml", "运动户外", 109.0, 85.0, 250,
+     "304不锈钢内胆;防漏杯盖;提绳设计;不适合盛装碳酸饮料"),
+    ("YX-8005", "轻氧折叠露营椅", "运动户外", 159.0, 129.0, 130,
+     "钢管支架;侧边收纳袋;附手提袋;建议承重不超过100kg"),
+    ("YX-9003", "素颜保湿身体乳 300ml", "美妆个护", 79.0, 59.0, 320,
+     "乳液质地;含甘油;泵头取用;初次使用建议局部试用"),
+    ("YX-9004", "素颜柔软洁面巾 80抽", "美妆个护", 29.9, 22.9, 680,
+     "干湿两用;抽取式包装;无香型;不可直接冲入马桶"),
+    ("YX-9005", "素颜旅行分装瓶 6件套", "美妆个护", 39.0, 29.0, 290,
+     "含按压瓶与喷雾瓶;附标签贴;透明收纳袋;勿装高浓度酒精"),
 ]
 
 ORDERS = [
@@ -151,24 +212,42 @@ FAQS = [
 
 
 def ensure_db(db_path: str) -> sqlite3.Connection:
-    """建库(幂等)并写入种子数据,返回连接。"""
+    """Initialize db_path and add missing seed products without overwriting existing data."""
     path = Path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
-    if conn.execute("SELECT COUNT(*) FROM products").fetchone()[0] == 0:
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(orders)")}
+    legacy_orders = "buyer_id" not in columns
+    if legacy_orders:
+        conn.execute("ALTER TABLE orders ADD COLUMN buyer_id TEXT NOT NULL DEFAULT ''")
+    fresh = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0] == 0
+    # 已有数据库只补商品，不覆盖运营修改 / Add missing products, preserve edits.
+    with conn:
         conn.executemany(
-            "INSERT INTO products VALUES (?,?,?,?,?,?,?)", PRODUCTS)
-        conn.executemany(
-            "INSERT INTO orders VALUES (?,?,?,?,?,?,?,?,?)", ORDERS)
-        conn.executemany(
-            "INSERT INTO logistics VALUES (?,?,?)", LOGISTICS)
-        conn.executemany(
-            "INSERT INTO coupons(sku, threshold, discount) VALUES (?,?,?)",
-            COUPONS)
-        conn.executemany(
-            "INSERT INTO faqs(question, answer, category) VALUES (?,?,?)",
-            FAQS)
-        conn.commit()
+            "INSERT OR IGNORE INTO products VALUES (?,?,?,?,?,?,?)", PRODUCTS,
+        )
+        if fresh:
+            conn.executemany(
+                "INSERT OR IGNORE INTO orders "
+                "(order_id, sku, quantity, amount, status, buyer, address, note, created_at, buyer_id) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                [(*order, "buyer-demo") for order in ORDERS],
+            )
+            conn.executemany("INSERT OR IGNORE INTO logistics VALUES (?,?,?)", LOGISTICS)
+            conn.executemany(
+                "INSERT INTO coupons(sku, threshold, discount) VALUES (?,?,?)", COUPONS,
+            )
+            conn.executemany(
+                "INSERT INTO faqs(question, answer, category) VALUES (?,?,?)", FAQS,
+            )
+        if legacy_orders:
+            # 只关联已知演示订单，未知历史订单保持未关联 / Migrate demo ownership only.
+            conn.executemany(
+                "UPDATE orders SET buyer_id = 'buyer-demo' "
+                "WHERE order_id = ? AND buyer = ? AND buyer_id = ''",
+                [(order[0], order[5]) for order in ORDERS],
+            )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_buyer ON orders(buyer_id)")
     return conn

@@ -32,9 +32,33 @@ class Scenario:
     db_checks: list[tuple[str, tuple, object]] = field(default_factory=list)
     # 场景开始前预置 SQL(如写入买家记忆)
     preset_sql: list[str] = field(default_factory=list)
+    buyer_id: str = "anonymous"
 
 
 SCENARIOS = [
+    Scenario(
+        name = "当前买家全部订单",
+        turns = ["查询我的当前订单", "查询我当前的所有订单", "我想查询我的所有订单"],
+        expect_tools = ["list_orders", "list_orders", "list_orders"],
+        forbid_events = ["handoff", "tool_error", "correction"],
+        reply_contains = ["20260701001", "20260701002", "20260701003"],
+        buyer_id = "buyer-demo",
+        db_checks = [("SELECT count(*) FROM tickets", (), 0)],
+    ),
+    Scenario(
+        name = "新买家无订单",
+        turns = ["查询我的所有订单"],
+        expect_tools = ["list_orders"],
+        forbid_events = ["handoff", "tool_error"],
+        reply_contains = ["暂无订单"],
+        buyer_id = "buyer-new",
+    ),
+    Scenario(
+        name = "新增商品露营椅",
+        turns = ["露营椅"],
+        expect_tools = ["search_products"],
+        reply_contains = ["YX-8005"],
+    ),
     Scenario(
         name="商品咨询-耳机推荐",
         turns=["有降噪耳机推荐吗"],

@@ -32,7 +32,7 @@ Core tests use MockLLM or simulated HTTP without network access. Four optional v
 ### Eval (trajectory scenarios)
 
 ```bash
-python eval/run_eval.py          # 15 scripted scenarios, pass/fail matrix
+python eval/run_eval.py          # 18 scripted scenarios, pass/fail matrix
 python eval/run_eval.py --gate   # exit-code variant used as CI/self-evolution gate
 ```
 
@@ -103,7 +103,7 @@ The decoupling rule: the harness only talks to a model through the `LLMClient` P
 
 ### Tools (`shopharness/tools/`)
 
-`registry.py` defines `Tool`/`ToolRegistry` (OpenAI function-calling schemas; a whitelist trims what reaches the 8B model). `servers.py` builds the 9 business tools over SQLite and the two guardrail/audit hooks. Key design point: **robustness lives in the tools, not the model** — tools self-correct bad model args (e.g. an invalid category falls back to full search with a note) rather than assuming correct parameters.
+`registry.py` defines `Tool`/`ToolRegistry` (OpenAI function-calling schemas; a whitelist trims what reaches the 8B model). `servers.py` builds the 10 business tools over SQLite and the two guardrail/audit hooks. Key design point: **robustness lives in the tools, not the model** — tools self-correct bad model args (e.g. an invalid category falls back to full search with a note) rather than assuming correct parameters.
 
 ### Long-running flows (`shopharness/flows/aftersale.py`)
 
@@ -115,7 +115,7 @@ The aftersale ticket flow is the one place using **LangGraph** (not the main loo
 
 ### Data
 
-Single SQLite DB (`shopharness/data/shop.db`, schema + seed in `data/seed.py`, created lazily via `ensure_db()`): product/order tables, `tickets`, `audit`, memory, and the vector store. `traces/` and `models/` are gitignored runtime artifacts.
+Single SQLite DB (`shopharness/data/shop.db`, schema + seed in `data/seed.py`, created lazily via `ensure_db()`): 50 fictional seed products, buyer-scoped order lists, `tickets`, `audit`, memory, and the vector store. Existing databases add missing products without overwriting edits; legacy demo orders gain `buyer_id=buyer-demo`. `list_orders()` is bound to the application-supplied buyer ID, not model arguments. `traces/` and `models/` are gitignored runtime artifacts.
 
 ## Conventions
 

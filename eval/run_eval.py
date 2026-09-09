@@ -24,7 +24,7 @@ def run_scenario(sc: Scenario, tmpdir: str) -> list[str]:
                  "rag_enabled": False,  # 评测用 Mock,语义检索单测覆盖
                  **sc.settings_overrides}
     settings = Settings(**overrides)
-    harness = build_harness(settings, MockLLM())
+    harness = build_harness(settings, MockLLM(), buyer_id = sc.buyer_id)
     for sql in sc.preset_sql:
         harness.conn.execute(sql)
     harness.conn.commit()

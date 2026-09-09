@@ -14,7 +14,7 @@ def manager() -> SkillManager:
 def test_load_builtin_skills():
     mgr = manager()
     assert set(mgr.skills) == {"inquiry-conversion", "urge-payment",
-                               "return-sop"}
+                               "return-sop", "order-query"}
     skill = mgr.skills["inquiry-conversion"]
     assert "search_products" in skill.tools
     assert "转化" in skill.instructions

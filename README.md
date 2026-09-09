@@ -9,10 +9,10 @@
 | --- | --- | --- |
 | Harness 主 loop | turn 管理、最大步数、非法工具自我纠正、连续失败熔断 | `shopharness/core/harness.py` |
 | 上下文工程 | 分层上下文(L0 技能指令 / L1 记忆 / L2 结构化状态 / L3+L4 历史)+ 三级 compaction | `shopharness/core/context.py` |
-| 工具系统 | 9 个业务工具(SQLite),OpenAI function calling schema,按技能白名单动态裁剪 | `shopharness/tools/` |
+| 工具系统 | 10 个业务工具(SQLite),OpenAI function calling schema,按技能白名单动态裁剪 | `shopharness/tools/` |
 | **RAG 检索增强** | 云端 Embedding 或本地 bge-small-zh + 关键词检索,商品 RRF 混合排序;商品库 + FAQ 知识库;向量不可用时自动降级 | `shopharness/core/rag.py` |
 | 权限模型 | READ / WRITE / DANGEROUS 三级;改价须经买家复述确认 + 最低限价护栏 + 审计落库 | `shopharness/core/permissions.py`、`hooks.py` |
-| Skills | 目录式 SKILL.md(询单转化 / 催付 / 退换 SOP),意图路由激活,热加载 | `skills/`、`core/skills.py` |
+| Skills | 目录式 SKILL.md(询单转化 / 订单查询 / 催付 / 退换 SOP),意图路由激活,热加载 | `skills/`、`core/skills.py` |
 | 转人工 | 关键词/熔断/步数超限触发,自动生成交接摘要并建工单 | `shopharness/core/handoff.py` |
 | **子代理(M3)** | 上下文隔离的检索/售后子代理,仅回传结论摘要;注册为 `delegate_*` 工具 | `shopharness/core/subagent.py` |
 | **长程流程(M3)** | LangGraph 售后工单流程,interrupt 等买家确认,SqliteSaver checkpoint 跨进程恢复 | `shopharness/flows/aftersale.py` |
@@ -20,7 +20,7 @@
 | **自进化(M4)** | bad case 挖掘 → LLM 提案 → 离线门禁 → 灰度/回滚,dry-run 默认 | `evolve/` |
 | **数据飞轮(M4)** | traces → SFT/DPO JSONL 导出,PII 脱敏 + schema 校验 | `evolve/export_*.py` |
 | 可观测性 | JSONL trace,字段对齐 OTel GenAI 语义约定 | `shopharness/core/trace.py` |
-| 评测 | 15 条脚本化场景,trajectory 断言 + `--gate` 回归门禁 | `eval/` |
+| 评测 | 18 条脚本化场景,trajectory 断言 + `--gate` 回归门禁 | `eval/` |
 
 ## 安装与 Mock 模式
 
@@ -135,6 +135,33 @@ python -m shopharness.cli --endpoint http://localhost:8000/v1
 >   `conda install gcc_linux-64` 即可);无编译器时也可 `--enforce-eager`
 > - 系统无 nvcc → 必须 `VLLM_USE_FLASHINFER_SAMPLER=0` 关闭 flashinfer JIT 采样器
 
+## 商品数据与我的订单
+
+内置 **50 件虚构商品**，覆盖数码影音、电脑外设、家居生活、服饰鞋包、生活电器、食品酒水、母婴玩具、运动户外和美妆个护。
+启动时会把旧数据库缺少的种子商品补齐，保留已有价格、库存、订单备注与金额；自定义商品也不会被删除。
+商品和 FAQ 的云端向量缓存会增量更新。
+
+新增只读工具 `list_orders()`，无需订单号，查询当前会话买家的全部订单，返回订单号、商品、数量、金额、状态和创建时间。
+内置三笔演示订单归属默认账号 `buyer-demo`；原来的演示姓名和收货信息保留。
+历史数据库自动补充 `orders.buyer_id`，只关联已知演示订单，其他未归属的历史订单不会出现在任何买家的列表中。
+
+```bash
+# 使用 .env 中配置的云端服务，默认买家 buyer-demo
+python -m shopharness.cli
+
+# 完全离线查看演示订单
+python -m shopharness.cli --mock --buyer buyer-demo
+
+# 独立买家：没有关联订单时正常返回“暂无订单”
+python -m shopharness.cli --mock --buyer buyer-new
+```
+
+可以直接输入“查询我的当前订单”“查询我当前的所有订单”或“我想查询我的所有订单”。
+客服先调用 `list_orders` 列出订单，选定订单后再用 `get_order` 或 `get_logistics` 查看详情。
+订单列表工具的买家身份由应用绑定，不接受模型传入买家 ID；CLI 的 `--buyer` 是演示身份，接入真实渠道时应由已认证会话提供。
+
+`models/`、`traces/` 和 `evolve/out/` 使用 `.gitkeep` 保留目录；模型权重、会话记录、训练导出和 SQLite 缓存仍被忽略。
+
 ## 一次真实会话长什么样
 
 ```
@@ -201,7 +228,7 @@ python evolve/eval_lora.py --model cs-sft   # 留出集对比
 shopharness/        # harness 包(core / llm / tools / flows / data / cli)
 skills/             # SKILL.md 技能(可热加载)
 evolve/             # 自进化闭环 + SFT/DPO 数据飞轮导出(M4)
-eval/               # 15 条 trajectory 评测场景(含 --gate 回归门禁)
+eval/               # 18 条 trajectory 评测场景(含 --gate 回归门禁)
 tests/              # Mock / HTTP 模拟测试,另含 4 项可选本地向量集成测试
 scripts/            # 模型下载 + vLLM 启动
 traces/             # 运行生成的 JSONL trace(gitignore)

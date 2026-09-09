@@ -1,4 +1,4 @@
-"""8 个业务工具的 SQLite 实现 + 护栏/审计 hook 工厂。
+"""10 个业务工具的 SQLite 实现 + 护栏/审计 hook 工厂。
 
 约定:
 - 工具返回 dict;业务性失败返回 {"error": "..."}(软失败,回注给模型)
@@ -23,8 +23,12 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
 
 # ---------------------------------------------------------------- 工具实现
 
-def make_tools(conn: sqlite3.Connection,
-               vector_store: "VectorStore | None" = None) -> list[Tool]:
+def make_tools(
+    conn: sqlite3.Connection,
+    vector_store: "VectorStore | None" = None,
+    buyer_id: str = "anonymous",
+) -> list[Tool]:
+    """Bind tools to conn, optional vector_store and the trusted session buyer_id."""
 
     def search_products(keyword: str, category: str | None = None) -> dict[str, Any]:
         if not keyword or not keyword.strip():
@@ -39,7 +43,8 @@ def make_tools(conn: sqlite3.Connection,
                     continue
                 haystack = (f"{row['sku']} {row['name']} {row['category']} "
                             f"{row['selling_points']}")
-                score = sum(haystack.count(t) for t in terms)
+                # 完整词匹配优先于单字兜底 / Exact terms outrank character fallback.
+                score = 2 * sum(haystack.count(t) for t in terms)
                 # 单字关键词也做包含匹配,兼容中文搜索习惯
                 if score == 0 and any(t in haystack for t in keyword):
                     score = 1
@@ -116,6 +121,20 @@ def make_tools(conn: sqlite3.Connection,
         if not row:
             return {"error": f"商品 {sku} 不存在"}
         return _row_to_dict(row)
+
+    def list_orders() -> dict[str, Any]:
+        """List orders belonging to the buyer bound by the application, without model input."""
+        if not buyer_id.strip() or buyer_id == "anonymous":
+            return {"count": 0, "orders": []}
+        # 身份来自会话，不接受模型传入 / Bind ownership outside the model's arguments.
+        rows = conn.execute(
+            "SELECT o.order_id, o.sku, p.name AS product_name, o.quantity, "
+            "o.amount, o.status, o.created_at FROM orders o "
+            "JOIN products p ON p.sku = o.sku WHERE o.buyer_id = ? "
+            "ORDER BY o.created_at DESC, o.order_id DESC",
+            (buyer_id,),
+        ).fetchall()
+        return {"count": len(rows), "orders": [_row_to_dict(row) for row in rows]}
 
     def get_order(order_id: str) -> dict[str, Any]:
         row = conn.execute(
@@ -206,7 +225,15 @@ def make_tools(conn: sqlite3.Connection,
                  "sku": {"type": "string", "description": "商品 SKU,如 YX-1001"}},
               "required": ["sku"]},
              Level.READ, get_product_detail),
-        Tool("get_order", "查询订单状态、金额、商品与收货信息",
+        Tool(
+            "list_orders",
+            "查询当前会话买家的全部订单，含订单号、商品、金额和状态。"
+            "用户查询我的订单/当前订单/所有订单但未提供订单号时优先调用；无需任何参数。",
+            {"type": "object", "properties": {}, "additionalProperties": False},
+            Level.READ,
+            list_orders,
+        ),
+        Tool("get_order", "凭已知订单号查询单笔订单状态、金额、商品与收货信息；未提供订单号时先用 list_orders",
              {**obj, "properties": {
                  "order_id": {"type": "string", "description": "订单号"}},
               "required": ["order_id"]},
@@ -246,10 +273,14 @@ def make_tools(conn: sqlite3.Connection,
     ]
 
 
-def build_registry(conn: sqlite3.Connection,
-                   vector_store: VectorStore | None = None) -> ToolRegistry:
+def build_registry(
+    conn: sqlite3.Connection,
+    vector_store: VectorStore | None = None,
+    buyer_id: str = "anonymous",
+) -> ToolRegistry:
+    """Register tools on conn with optional vector_store and trusted session buyer_id."""
     registry = ToolRegistry()
-    for tool in make_tools(conn, vector_store):
+    for tool in make_tools(conn, vector_store, buyer_id):
         registry.register(tool)
     return registry
 

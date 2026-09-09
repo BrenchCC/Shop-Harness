@@ -42,7 +42,7 @@ def build_harness(settings: Settings, llm: LLMClient,
         vector_store = create_vector_store(
             conn, settings.embedding_model, settings.cloud_embedding,
         )
-    registry = build_registry(conn, vector_store)
+    registry = build_registry(conn, vector_store, buyer_id = buyer_id)
     hooks = HookBus(pre_hooks=[make_price_guardrail(conn)],
                     post_hooks=[make_audit_hook(conn)])
     skills = SkillManager(skills_dir=settings.skills_dir)
