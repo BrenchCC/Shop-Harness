@@ -11,6 +11,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from shopharness.llm.base import LLMClient, Message
+from shopharness.prompts import PROPOSE_PROMPT
 
 # bad case 类型 → 最相关的技能
 TYPE_TO_SKILL = {
@@ -19,11 +20,6 @@ TYPE_TO_SKILL = {
     "circuit_break": "return-sop",
     "tool_errors": "inquiry-conversion",
 }
-
-PROPOSE_PROMPT = """你是客服 Agent 的技能优化师。以下是一类线上 bad case 与当前技能文件,
-请输出改进提案:1) 问题归因(1-2 句);2) 建议修改点(具体到指令条目);
-3) 修改后应追加/替换的指令文本。输出 Markdown,不要输出无关内容。"""
-
 
 def propose_for_type(case_type: str, cases: list[dict],
                      skill_content: str, llm: LLMClient) -> str:

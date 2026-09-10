@@ -17,6 +17,7 @@ dependencies = [
 [project.optional-dependencies]
 vllm = ["vllm>=0.25"]
 rag = ["transformers>=4.45"]
+mcp = ["fastmcp>=2.0,<3.0"]
 dev = ["pytest>=8.0"]
 
 [build-system]

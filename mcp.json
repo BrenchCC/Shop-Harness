@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "shopharness": {
+      "transport": "stdio",
+      "command": "conda",
+      "args": [
+        "run",
+        "--no-capture-output",
+        "-n",
+        "agent",
+        "python",
+        "-m",
+        "shopharness.mcp_server"
+      ],
+      "env": {
+        "SHOPHARNESS_BUYER_ID": "buyer-demo"
+      }
+    }
+  }
+}

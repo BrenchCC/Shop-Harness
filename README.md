@@ -13,6 +13,7 @@
 | **RAG 检索增强** | 云端 Embedding 或本地 bge-small-zh + 关键词检索,商品 RRF 混合排序;商品库 + FAQ 知识库;向量不可用时自动降级 | `shopharness/core/rag.py` |
 | 权限模型 | READ / WRITE / DANGEROUS 三级;改价须经买家复述确认 + 最低限价护栏 + 审计落库 | `shopharness/core/permissions.py`、`hooks.py` |
 | Skills | 目录式 SKILL.md(询单转化 / 订单查询 / 催付 / 退换 SOP),意图路由激活,热加载 | `skills/`、`core/skills.py` |
+| MCP Server | FastMCP 本地 STDIO / Streamable HTTP，复用业务工具、审计与改价护栏 | `shopharness/mcp_server.py`、`mcp.json` |
 | 转人工 | 关键词/熔断/步数超限触发,自动生成交接摘要并建工单 | `shopharness/core/handoff.py` |
 | **子代理(M3)** | 上下文隔离的检索/售后子代理,仅回传结论摘要;注册为 `delegate_*` 工具 | `shopharness/core/subagent.py` |
 | **长程流程(M3)** | LangGraph 售后工单流程,interrupt 等买家确认,SqliteSaver checkpoint 跨进程恢复 | `shopharness/flows/aftersale.py` |
@@ -37,6 +38,28 @@ printf '有降噪耳机推荐吗\n帮我把订单 20260701001 改价到 900 元\
 ```
 
 未安装本地 bge 模型或向量依赖时，4 项向量集成测试会跳过；关键词检索和降级测试仍会运行。
+
+## 本地 MCP Server
+
+安装 MCP 扩展后，可以通过 STDIO 接入本地 MCP 客户端：
+
+```bash
+pip install -e '.[mcp]'
+python -m shopharness.mcp_server
+```
+
+仓库根目录的 `mcp.json` 已提供本项目 `agent` Conda 环境的 STDIO 配置，并绑定演示买家 `buyer-demo`。
+复制到其他 MCP 客户端时，需要保持工作目录为仓库根目录。STDIO 配置使用 `conda run --no-capture-output`，避免 Conda 缓冲 MCP 协议消息。
+
+需要用 MCP Inspector 或其他 HTTP 客户端调试时，可启动 Streamable HTTP：
+
+```bash
+python -m shopharness.mcp_server --transport http --host 127.0.0.1 --port 8001
+```
+
+端点为 `http://127.0.0.1:8001/mcp`。可通过 `SHOPHARNESS_DB_PATH` 和
+`SHOPHARNESS_BUYER_ID` 设置数据库及可信买家身份；命令行参数优先。`adjust_price`
+必须传入 `confirmed=true`，且仍受最低限价护栏和审计约束。
 
 ## 云端 API 模式
 
@@ -226,6 +249,7 @@ python evolve/eval_lora.py --model cs-sft   # 留出集对比
 
 ```
 shopharness/        # harness 包(core / llm / tools / flows / data / cli)
+  prompts/          # 集中的系统、子代理和自进化 Prompt
 skills/             # SKILL.md 技能(可热加载)
 evolve/             # 自进化闭环 + SFT/DPO 数据飞轮导出(M4)
 eval/               # 18 条 trajectory 评测场景(含 --gate 回归门禁)

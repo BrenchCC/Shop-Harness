@@ -20,23 +20,8 @@ from pydantic import BaseModel, Field
 
 from ..config import Settings, estimate_tokens
 from ..llm.base import LLMClient, Message
+from ..prompts import BASE_PROMPT, EXTRACT_PROMPT, SUMMARY_PROMPT
 from .skills import Skill
-
-BASE_PROMPT = """你是电商店铺的 AI 客服,正在服务买家咨询。
-
-红线:
-- 只使用工具返回的真实数据,禁止编造商品参数、库存、价格与物流信息
-- 改价、退款等危险操作必须先获得买家明确确认
-- 不知道的问题诚实说明,必要时建议转人工
-- 买家查询自己的当前订单或全部订单且未给订单号时，先调用 list_orders，无需索要订单号或转人工
-风格:简洁、专业、友好,回复控制在 150 字以内。"""
-
-EXTRACT_PROMPT = """请从以下对话片段中抽取关键事实,每行一条,格式「事实名: 值」。
-只抽取:买家看中的商品 SKU、涉及的订单号、买家明确确认过的事项、价格承诺。
-没有则输出「无」。"""
-
-SUMMARY_PROMPT = """请将以下对话压缩为 100 字以内的摘要,保留:买家诉求、已确认事实、
-已执行的操作、当前进展。直接输出摘要文本。"""
 
 
 class SessionState(BaseModel):
